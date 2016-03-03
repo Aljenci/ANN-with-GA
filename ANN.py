@@ -64,7 +64,7 @@ class ANN:
                 actual_weight_index = actual_weight_index + node.get_num_inputs()
 
 class Chromosome:
-    def __init__(self, size, mutation_probability = 10, data = []):
+    def __init__(self, size, mutation_probability = 20, data = []):
         if data == []:
             self.data = [uniform(0.0, 1.0) for i in range(size)]
         else:
@@ -87,12 +87,12 @@ class Chromosome:
         return child1, child2
 
     def mutation(self):
-        while randint(0, 100) <= self.mutation_probability:
+        if randint(0, 100) <= self.mutation_probability:
             index = randint(0,len(self.data)-1)
             self.data[index] = self.data[index] + uniform(-1.0, 1.0)
 
     def adaptability(self, test_case):
-        ann = ANN(6, 15, [4, 4])
+        ann = ANN(6, 4, [8, 6])
         ann.set_weight(self.data)
         score_list = []
         for case in test_case:
@@ -101,22 +101,21 @@ class Chromosome:
             ann.set_input(list_input)
             ann.recalculate()
             list_output = ann.get_output()
+            result_dec = list_output[0]*2**3+list_output[0]*2**2+list_output[0]*2**1+list_output[0]*2**0
+            score = (abs(result_dec - case[2]) - 14) / float(-14)
             #comparation = [result_bin[i] == list_output[i] for i in range(4)]
             #score = sum(comparation) * 100 / 4
             #score = sum(comparation) == 4
-            score = [1 if not i else -1 for i in list_output]
-            score[case[2]] = -score[case[2]]
-            score = (sum(score) + 15) / float(30)
             score_list.append(score)
         return sum(score_list) / len(score_list)
 
 class GA:
-    def __init__(self, test_case, max_generations = 1000, init_population_size = 5, max_population_size = 20, max_life_time = 5):
+    def __init__(self, test_case, max_generations = 1000, init_population_size = 10, max_population_size = 100, max_life_time = 1000):
         self.test_case = test_case
         self.max_generations = max_generations
         self.max_life_time = max_life_time
         self.max_population_size = max_population_size
-        self.population = [Chromosome(6*4 + 4*4 + 4*15 + 6+15+4+4) for i in range(init_population_size)]
+        self.population = [Chromosome(6*8 + 8*6 + 6*4 + 6+4+8+6) for i in range(init_population_size)]
         self.best = self.population[0].data
         self.best_equal_count = 0
 
@@ -144,9 +143,9 @@ class GA:
     def crossover(self):
         for i in range(0, len(self.population)-4, 2):
             child1_data, child2_data = self.population[i].crossover(self.population[i+1])
-            child1 = Chromosome(6*4 + 4*4 + 4*15 + 6+15+4+4, data = child1_data)
+            child1 = Chromosome(6*8 + 8*6 + 6*4 + 6+4+8+6, data = child1_data)
             child1.mutation()
-            child2 = Chromosome(6*4 + 4*4 + 4*15 + 6+15+4+4, data = child2_data)
+            child2 = Chromosome(6*8 + 8*6 + 6*4 + 6+4+8+6, data = child2_data)
             child2.mutation()
             self.population.append(child1)
             self.population.append(child2)
