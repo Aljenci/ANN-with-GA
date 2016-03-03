@@ -8,7 +8,7 @@ class Node:
         self.bias = bias
         self.output = 0.0
         self.threeshold = 1.0
-        self.weight = [uniform(-1.0, 1.0) for e in input]
+        self.weight = [uniform(0.0, 1.0) for e in input]
 
     def calculate(self):
 
@@ -20,6 +20,9 @@ class Node:
 
     def set_weight(self, w):
         self.weight = w
+
+    def set_bias(self, b):
+        self.bias = b
         
     def get_num_inputs(self):
         return len(self.input)
@@ -28,24 +31,25 @@ class ANN:
 
     def __init__(self, n_in, n_out, hidden_layers):
 
-        self.layer = [[Node([1.0], 1.0) for n in range(n_in)]]
+        self.layer = [[Node([1.0], 0.0) for n in range(n_in)]]
         for i in range(len(hidden_layers)):
-            self.layer.append([Node(self.layer[-1], 0.0) for j in range(hidden_layers[i])])
-        self.layer.append([Node(self.layer[-1], 0.0) for j in range(n_out)])
+            self.layer.append([Node(self.layer[-1], uniform(-1.0, 1.0)) for j in range(hidden_layers[i])])
+        self.layer.append([Node(self.layer[-1], uniform(-1.0, 1.0)) for j in range(n_out)])
 
     def get_output(self):
 
-        return [node.output for node in self.layer[-1]]
+        out_list = [node.output for node in self.layer[-1]]
+        return out_list
 
     def set_input(self, input):
 
         for i in range(len(self.layer[0])):
-            self.layer[0][i].input = input[i]
-        self.recalculate()
+            node = self.layer[0][i]
+            node.input = input[i]
 
     def recalculate(self):
 
-        for layer in self.layer[1:-1]:
+        for layer in self.layer:
             for node in layer:
                 node.calculate()
     
@@ -54,6 +58,8 @@ class ANN:
         for i in range(1,len(self.layer)):
             layer = self.layer[i]
             for node in layer:
+                node.set_bias(weight[actual_weight_index])
+                actual_weight_index = actual_weight_index + 1
                 node.set_weight(weight[actual_weight_index:actual_weight_index+node.get_num_inputs()])
                 actual_weight_index = actual_weight_index + node.get_num_inputs()
 
@@ -90,16 +96,19 @@ class Chromosome:
         ann.set_weight(self.data)
         score_list = []
         for case in test_case:
-            list_input = [bool(0b100 & case[0]), bool(0b010 & case[0]), bool(0b001 & case[0]), bool(0b100 & case[1]), bool(0b010 & case[1]), bool(0b001 & case[1])]
+            list_input = [[bool(0b100 & case[0])], [bool(0b010 & case[0])], [bool(0b001 & case[0])], [bool(0b100 & case[1])], [bool(0b010 & case[1])], [bool(0b001 & case[1])]]
             #result_bin = [bool(0b1000 & case[2]), bool(0b0100 & case[2]), bool(0b0010 & case[2]), bool(0b0001 & case[2])]
             ann.set_input(list_input)
+            ann.recalculate()
             list_output = ann.get_output()
             #comparation = [result_bin[i] == list_output[i] for i in range(4)]
             #score = sum(comparation) * 100 / 4
             #score = sum(comparation) == 4
-            score = list_output[case[2]]
+            score = [1 if not i else -1 for i in list_output]
+            score[case[2]] = -score[case[2]]
+            score = (sum(score) + 15) / float(30)
             score_list.append(score)
-        return sum(score_list)
+        return sum(score_list) / len(score_list)
 
 class GA:
     def __init__(self, test_case, max_generations = 1000, init_population_size = 5, max_population_size = 20, max_life_time = 5):
@@ -107,7 +116,7 @@ class GA:
         self.max_generations = max_generations
         self.max_life_time = max_life_time
         self.max_population_size = max_population_size
-        self.population = [Chromosome(6*6 + 6*6 + 6*14) for i in range(init_population_size)]
+        self.population = [Chromosome(6*6 + 6*6 + 6*15 + 6+15+6+6) for i in range(init_population_size)]
         self.best = self.population[0].data
         self.best_equal_count = 0
 
@@ -119,7 +128,7 @@ class GA:
             self.best_equal_count = 0
             self.best = self.get_best().data
         self.crossover()
-        self.mutation()
+        #self.mutation()
         for i in self.population:
             if i.life_time > self.max_life_time:
                 self.population.remove(i)
@@ -127,15 +136,17 @@ class GA:
                 i.life_time += 1
 
     def sort(self):
-        self.population = [p for (a, p) in reversed(sorted(zip(self.adaptability(), self.population)))]
+        self.population = [(a, p) for (a, p) in reversed(sorted(zip(self.adaptability(), self.population)))]
+        #print [a for (a, p) in self.population]
+        self.population = [p for (a, p) in self.population]
         self.population = self.population[:self.max_population_size]
 
     def crossover(self):
         for i in range(0, len(self.population)-4, 2):
             child1_data, child2_data = self.population[i].crossover(self.population[i+1])
-            child1 = Chromosome(6*6 + 6*6 + 6*14, data = child1_data)
+            child1 = Chromosome(6*6 + 6*6 + 6*15 + 6+15+6+6, data = child1_data)
             child1.mutation()
-            child2 = Chromosome(6*6 + 6*6 + 6*14, data = child2_data)
+            child2 = Chromosome(6*6 + 6*6 + 6*15 + 6+15+6+6, data = child2_data)
             child2.mutation()
             self.population.append(child1)
             self.population.append(child2)
@@ -148,7 +159,7 @@ class GA:
             i.mutation()
 
     def get_best(self):
-        return [p for (a, p) in sorted(zip(self.adaptability(), self.population))][0]
+        return [p for (a, p) in reversed(sorted(zip(self.adaptability(), self.population)))][0]
         
 def main():
     test_case = [[randint(0,7), randint(0,7), 0] for i in range(100)]
